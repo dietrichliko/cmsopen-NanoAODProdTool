@@ -1,0 +1,25 @@
+#
+#
+universe = vanilla
+
+executable = nanoaod.sh
+arguments = $(job_nr} $(first_file) $(last_file)
+
+should_transfer_files = YES
+transfer_input_files = {{jobscript}} file_index.txt {{metadata}}
+transfer_output_files = metadata.json
+
+output = {{log_location}}/{{dataset}}_$(Cluster)-$(Process).out
+error = {{log_location}}/{{dataset}}_$(Cluster)-$(Process).err
+log =  {{log_location}}/{{dataset}}_$(Cluster).log
+
++DESIRED_SITES = "{{','.join(sites)}}"
+
++SingularityImage = "{{singularity}}"
+
+
+Queue job_nr first_file last_file from (
+{% for i, j in jobs.items() -%}
+{{i}} {{j['first']}} {{j['last']}}
+{% endfor -%}
+)

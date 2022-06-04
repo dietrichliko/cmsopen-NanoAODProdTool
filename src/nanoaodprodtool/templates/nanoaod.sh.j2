@@ -1,0 +1,36 @@
+#!/bin/bash
+#
+# Run nanoaodplus using CMSCONNECT
+#
+# Dietrich Liko, June 2022
+
+export JOB_NUMBER=$1
+export FIRST_FILE=$2
+export LAST_FILE=$3
+
+. /cvmfs/cms.cern.ch/cmsset_default.sh
+
+# unpack sandbox - no need to do more as cmssw is on cvmfs
+scramv1 project CMSSW {{release}}
+tar xjf sandbox.tar.bz2
+if (( $? != 0 )); then
+    echo "Error unpacking sandbox" >&2
+    exit 1
+fi
+
+cd {{release}}/src
+eval `scramv1 runtime -sh`
+cd -
+
+cmsRun {{jobscript}}
+if (( $? != 0 )); then
+    echo "Error cmsRun {{jobscript}}" >&2
+    exit 1
+fi
+
+read -u 3 uuid 3< /proc/sys/kernel/random/uuid
+export OUTPUT_URL="{{output}}/${uuid^^}.root"
+
+xrdcp --nopbar --retry 3 --checksum adler32:print test.dat "$OUTPUT_URL"
+
+metadata output.root $OUTPUT_URL
