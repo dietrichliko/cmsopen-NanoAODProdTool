@@ -19,7 +19,7 @@ log =  {{log_location}}/{{dataset}}_$(Cluster).log
 
 
 Queue job_nr first_file last_file from (
-{% for i, j in jobs.items() -%}
-{{i}} {{j['first']}} {{j['last']}}
+{% for j in jobs -%}
+{{j.nr}} {{j.first_file}} {{j.last_file}}
 {% endfor -%}
 )

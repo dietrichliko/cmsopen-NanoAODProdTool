@@ -11,14 +11,14 @@ export LAST_FILE=$3
 . /cvmfs/cms.cern.ch/cmsset_default.sh
 
 # unpack sandbox - no need to do more as cmssw is on cvmfs
-scramv1 project CMSSW {{release}}
+scramv1 project CMSSW {{cmssw}}
 tar xjf sandbox.tar.bz2
 if (( $? != 0 )); then
     echo "Error unpacking sandbox" >&2
     exit 1
 fi
 
-cd {{release}}/src
+cd {{cmssw}}/src
 eval `scramv1 runtime -sh`
 cd -
 
@@ -29,8 +29,14 @@ if (( $? != 0 )); then
 fi
 
 read -u 3 uuid 3< /proc/sys/kernel/random/uuid
-export OUTPUT_URL="{{output}}/${uuid^^}.root"
-
+export OUTPUT_URL="{{output_url}}/${uuid^^}.root"
 xrdcp --nopbar --retry 3 --checksum adler32:print test.dat "$OUTPUT_URL"
+if (( $? != 0 )); then
+    export OUTPUT_URL="{{backup_url}}/${uuid^^}.root"
+    xrdcp --nopbar --retry 3 --checksum adler32:print test.dat "$OUTPUT_URL"
+    if (( $? != 0 )); then
+        exit 1
+    endif
+endif
 
 metadata output.root $OUTPUT_URL

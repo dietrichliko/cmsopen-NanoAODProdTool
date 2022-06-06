@@ -61,6 +61,14 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [[package]]
+name = "finite-state-machine"
+version = "0.5.0"
+description = "Lightweight, decorator-based implementation of a Finite State Machine"
+category = "main"
+optional = false
+python-versions = ">=3.6, <4"
+
+[[package]]
 name = "flake8"
 version = "4.0.1"
 description = "the modular source code checker: pep8 pyflakes and co"
@@ -278,7 +286,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "9a7729f36762f843259f190fc228f67e28ef7f0f74707da2b5c5f68ea1c87ae0"
+content-hash = "3ad25ba560e538501cd297bf4eaae7e3a48a5ad5087969fc59741a6a8b961cb2"
 
 [metadata.files]
 atomicwrites = [
@@ -321,6 +329,10 @@ click = [
 colorama = [
     {file = "colorama-0.4.4-py2.py3-none-any.whl", hash = "sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2"},
     {file = "colorama-0.4.4.tar.gz", hash = "sha256:5941b2b48a20143d2267e95b1c2a7603ce057ee39fd88e7329b0c292aa16869b"},
+]
+finite-state-machine = [
+    {file = "finite-state-machine-0.5.0.tar.gz", hash = "sha256:ac08e609315e1c8ee1b374ddfb275820efb1cf8ea0a58c47699dfc8bee36f8a1"},
+    {file = "finite_state_machine-0.5.0-py3-none-any.whl", hash = "sha256:9ad1e513e672f3ffda2ef06cb0504c9e1621ea7b13ab9d3ceefa77f88c12399c"},
 ]
 flake8 = [
     {file = "flake8-4.0.1-py2.py3-none-any.whl", hash = "sha256:479b1304f72536a55948cb40a32dce8bb0ffe3501e26eaf292c7e60eb5e0428d"},
