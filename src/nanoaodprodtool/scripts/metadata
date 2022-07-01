@@ -19,7 +19,7 @@ import zlib
 
 import ROOT
 
-BLOCKSIZE=1024*1024*1024
+BLOCKSIZE = 1024 * 1024 * 1024
 
 
 def main(file_name, url, first, last):
@@ -31,21 +31,26 @@ def main(file_name, url, first, last):
         "checksum": get_checksum(file_name),
         "parents": get_parents(first, last),
     }
-    with open('metadata.json') as out:
+    with open("metadata.json", "w") as out:
         json.dump(metadata, out)
+
 
 def get_entries(file_name):
 
     file = ROOT.TFile(file_name, "READ")
     tree = file.Get("Events")
-    return tree.GetEntries()
+    entries = tree.GetEntries()
+    file.Close()
+    return entries
+
 
 def get_parents(first, last):
 
     files = open("file_index.txt", "r").read().splitlines()
-    return files[first:last]
+    return files[int(first) : int(last)]
 
-def get_checksum(file_name)
+
+def get_checksum(file_name):
 
     with open(file_name, "r") as inp:
         checksum = 1
@@ -55,7 +60,8 @@ def get_checksum(file_name)
                 break
             checksum = zlib.adler32(data, checksum)
 
-    return hex(checksum)[2:].zfill(8)
+    return "%08x" % (checksum & 0xFFFFFFFF)
+
 
 if __name__ == "__main__":
-    main(*sys.argv[1:4])
+    main(*sys.argv[1:5])

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 #
 # Run nanoaodplus using CMSCONNECT
 #
@@ -12,31 +12,34 @@ export LAST_FILE=$3
 
 # unpack sandbox - no need to do more as cmssw is on cvmfs
 scramv1 project CMSSW {{cmssw}}
-tar xjf sandbox.tar.bz2
-if (( $? != 0 )); then
+tar xzf sandbox.tar.gz
+if [ $? -ne 0 ]; then
     echo "Error unpacking sandbox" >&2
     exit 1
 fi
 
-cd {{cmssw}}/src
-eval `scramv1 runtime -sh`
-cd -
-
-cmsRun {{jobscript}}
-if (( $? != 0 )); then
-    echo "Error cmsRun {{jobscript}}" >&2
-    exit 1
-fi
-
 read -u 3 uuid 3< /proc/sys/kernel/random/uuid
-export OUTPUT_URL="{{output_url}}/${uuid^^}.root"
-xrdcp --nopbar --retry 3 --checksum adler32:print test.dat "$OUTPUT_URL"
-if (( $? != 0 )); then
-    export OUTPUT_URL="{{backup_url}}/${uuid^^}.root"
-    xrdcp --nopbar --retry 3 --checksum adler32:print test.dat "$OUTPUT_URL"
-    if (( $? != 0 )); then
-        exit 1
-    endif
-endif
+OUTPUT_URL="{{output_url}}/${uuid^^}.root"
+BACKUP_URL="{{backup_url}}/${uuid^^}.root"
 
-metadata output.root $OUTPUT_URL
+(
+    cd {{cmssw}}/src
+    eval `scramv1 runtime -sh`
+    cd -
+
+    cmsRun {{jobscript}}
+    if [ $? -ne 0 ]; then
+        echo "Error cmsRun {{jobscript}}" >&2
+        exit 1
+    fi
+
+    ./metadata output.root "$OUTPUT_URL" "$FIRST_FILE" "$LAST_FILE"
+)
+
+xrdcp --nopbar --retry 3 --cksum adler32:print output.root "$OUTPUT_URL"
+if [ $? -ne 0 ]; then
+    xrdcp --nopbar --retry 3 --cksum adler32:print output.root "$BACKUP_URL"
+    if [ $? -ne 0 ]; then
+        exit 1
+    fi
+fi

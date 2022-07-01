@@ -1,5 +1,5 @@
 ---
-name: nanoaod
+name: nanojobs
 channels:
   - conda-forge
 dependencies:

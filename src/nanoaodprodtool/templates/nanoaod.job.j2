@@ -2,12 +2,13 @@
 #
 universe = vanilla
 
-executable = nanoaod.sh
-arguments = $(job_nr} $(first_file) $(last_file)
+executable = {{jobscript.parent / "nanoaod.sh"}}
+arguments = $(job_nr) $(first_file) $(last_file)
 
 should_transfer_files = YES
-transfer_input_files = {{jobscript}} file_index.txt {{metadata}}
+transfer_input_files = {{jobscript}}, {{jobscript.parent / "sandbox.tar.gz"}}, {{jobscript.parent / "file_index.txt"}}, {{metadata}}
 transfer_output_files = metadata.json
+transfer_output_remaps = "metadata.json = {{jobscript.parent.parent / "output/metadata_$(job_nr).json"}}"
 
 output = {{log_location}}/{{dataset}}_$(Cluster)-$(Process).out
 error = {{log_location}}/{{dataset}}_$(Cluster)-$(Process).err
@@ -20,6 +21,6 @@ log =  {{log_location}}/{{dataset}}_$(Cluster).log
 
 Queue job_nr first_file last_file from (
 {% for j in jobs -%}
-{{j.nr}} {{j.first_file}} {{j.last_file}}
+{{j.id}} {{j.first_file}} {{j.last_file}}
 {% endfor -%}
 )
