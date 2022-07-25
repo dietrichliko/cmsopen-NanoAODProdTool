@@ -1,0 +1,43 @@
+#!/bin/bash -x
+#
+# Run nanoaodplus using CMSCONNECT
+#
+# Dietrich Liko, June 2022
+
+export JOB_NUMBER=$1
+export FIRST_FILE=$2
+export LAST_FILE=$3
+
+. /cvmfs/cms.cern.ch/cmsset_default.sh
+
+# unpack sandbox - no need to do more as cmssw is on cvmfs
+scramv1 project CMSSW {{cmssw}}
+tar xzf sandbox.tar.gz
+if [ $? -ne 0 ]; then
+    echo "Error unpacking sandbox" >&2
+    exit 1
+fi
+
+uuid=$(cat /proc/sys/kernel/random/uuid | tr "[:lower:]" "[:upper:]")
+OUTPUT_URL="{{output_url}}/${uuid}.root"
+BACKUP_URL="{{backup_url}}/${uuid}.root"
+
+cd {{cmssw}}/src
+eval `scramv1 runtime -sh`
+cd -
+
+cmsRun {{pyscript}}
+if [ $? -ne 0 ]; then
+    echo "Error cmsRun {{pyscript}}" >&2
+    exit 1
+fi
+
+./metadata output.root "$OUTPUT_URL" "$FIRST_FILE" "$LAST_FILE"
+
+xrdcp -np -adler output.root "$OUTPUT_URL"
+if [ $? -ne 0 ]; then
+    xrdcp -np -adler output.root "$BACKUP_URL"
+    if [ $? -ne 0 ]; then
+        exit 1
+    fi
+fi

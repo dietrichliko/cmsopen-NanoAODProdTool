@@ -25,15 +25,25 @@ BACKUP_URL="{{backup_url}}/${uuid^^}.root"
 (
     cd {{cmssw}}/src
     eval `scramv1 runtime -sh`
-    cd -
 
-    cmsRun {{pyscript}}
+    cp ../../poet_cfg.py .
+    cp ../../file_index.txt .
+    tar xzvf ../../conddb.tar.gz
+
+    cmsRun poet_cfg.py {{dataflag}}
     if [ $? -ne 0 ]; then
-        echo "Error cmsRun {{pyscript}}" >&2
+        echo "Error cmsRun poet_cfg.py" >&2
         exit 1
     fi
 
-    ./metadata output.root "$OUTPUT_URL" "$FIRST_FILE" "$LAST_FILE"
+    mv output.root ../..
+)
+
+(
+    set +x 
+    . /cvmfs/sft.cern.ch/lcg/views/setupViews.sh LCG_98python3 x86_64-slc6-gcc8-opt
+    set -x
+    ./metadata_poet output.root "$OUTPUT_URL" "$FIRST_FILE" "$LAST_FILE"
 )
 
 xrdcp --nopbar --retry 3 --cksum adler32:print output.root "$OUTPUT_URL"

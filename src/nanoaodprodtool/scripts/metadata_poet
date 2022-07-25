@@ -1,0 +1,67 @@
+#!/usr/bin/env python
+"""Metadata for NanoAOD Production
+
+Metadata is written to metadata.json
+
+Usage:
+   metadata <file> <url> <first> <last>
+   
+Args:
+   file: local filename
+   url: remote url
+   first: first parent file in file_index.txt 
+   last: last parent file in file_index.txt (excluded)
+"""
+import json
+import os
+import sys
+import zlib
+
+import ROOT
+
+BLOCKSIZE = 1024 * 1024 * 1024
+
+
+def main(file_name, url, first, last):
+
+    metadata = {
+        "url": url,
+        "size": os.stat(file_name).st_size,
+        "entries": get_entries(file_name),
+        "checksum": get_checksum(file_name),
+        "parents": get_parents(first, last),
+    }
+    with open("metadata.json", "w") as out:
+        json.dump(metadata, out)
+
+
+def get_entries(file_name):
+
+    file = ROOT.TFile(file_name, "READ")
+    tree = file.Get("myelectrons/Events")
+    entries = tree.GetEntries()
+    file.Close()
+    return entries
+
+
+def get_parents(first, last):
+
+    files = open("file_index.txt", "r").read().splitlines()
+    return files[int(first) : int(last)]
+
+
+def get_checksum(file_name):
+
+    with open(file_name, "rb") as inp:
+        checksum = 1
+        while True:
+            data = inp.read(BLOCKSIZE)
+            if not data:
+                break
+            checksum = zlib.adler32(data, checksum)
+
+    return "%08x" % (checksum & 0xFFFFFFFF)
+
+
+if __name__ == "__main__":
+    main(*sys.argv[1:5])

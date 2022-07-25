@@ -2,11 +2,11 @@
 #
 universe = vanilla
 
-executable = {{pyscript.parent / "nanoaod.sh"}}
+executable = {{pyscript.parent / "poet.sh"}}
 arguments = $(job_nr) $(first_file) $(last_file)
 
 should_transfer_files = YES
-transfer_input_files = {{pyscript}}, {{pyscript.parent / "sandbox.tar.gz"}}, {{pyscript.parent / "file_index.txt"}}, {{metadata}}
+transfer_input_files = {{pyscript}}, {{pyscript.parent / "sandbox.tar.gz"}}, {{pyscript.parent / "file_index.txt"}}, {{metadata}}, {{metadata.parent / "merge_tree"}}, {{pyscript.parent.parent.parent / "conddb.tar.gz"}}
 transfer_output_files = metadata.json
 transfer_output_remaps = "metadata.json = {{pyscript.parent.parent / "output/metadata_$(job_nr).json"}}"
 

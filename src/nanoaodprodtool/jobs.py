@@ -25,7 +25,7 @@ log = logging.getLogger(__package__)
 j2_env = jinja2.Environment(loader=jinja2.PackageLoader(__package__, "templates"))
 
 SANDBOX_DIRS = ["bin", "cfipython", "config", "lib", "module", "python"]
-SANDBOX_SRC_DIRS = ["data", "interface", "python", "files"]
+SANDBOX_SRC_DIRS = ["data", "interface", "python", "files", "JEC"]
 
 FRAGMENT1 = """
 import os
@@ -37,8 +37,21 @@ process.source = cms.Source("PoolSource",
 )
 """
 
+FRAGMENT1P = """
+import os
+files = open("file_index.txt", "r").read().splitlines()
+f = int( os.environ["FIRST_FILE"])
+l = int( os.environ["LAST_FILE"])
+process.source = cms.Source("PoolSource",
+  fileNames = cms.untracked.vstring(*files[f:l])
+"""
+
 FRAGMENT2 = """
                 outFile = cms.string('output.root'),
+"""
+
+FRAGMENT2P = """
+process.TFileService = cms.Service("TFileService", fileName=cms.string("output.root"))
 """
 
 FRAGMENT3 = """
@@ -206,7 +219,7 @@ class Task(fsm.StateMachine):
 
     States:
         IDLE - Task created
-        READY - Task prapared
+        READY - Task prepared
         RUNNING - Task running on HTCondor
         DONE - Task excution finished
         ERROR - Task failed
@@ -292,7 +305,10 @@ class Task(fsm.StateMachine):
             output_dir.mkdir()
 
             self.prepare_sandbox(input_dir)
-            self.prepare_config(input_dir)
+            if self.config.endswith("Poet"):
+                self.prepare_config_poet(input_dir)
+            else:
+                self.prepare_config(input_dir)
             nr_files = self.prepare_fileindex(input_dir)
             self.prepare_jobscript(input_dir)
 
@@ -362,14 +378,14 @@ class Task(fsm.StateMachine):
             flag = True
             for i, line in enumerate(inp.readlines()):
                 if flag:
-                    if match := re_source.match(line):
+                    if re_source.match(line):
                         log.debug("Line %3d: Found input", i)
                         flag = False
                         out.write(FRAGMENT1)
-                    elif match := re_out.match(line):
+                    elif re_out.match(line):
                         log.debug("Line %3d: Found output", i)
                         out.write(FRAGMENT2)
-                    elif match := re_evt.match(line):
+                    elif re_evt.match(line):
                         log.debug("Line %3d: Found max events", i)
                         out.write(FRAGMENT3.format(self.max_events))
                     elif match := re_json.match(line):
@@ -378,8 +394,46 @@ class Task(fsm.StateMachine):
                     else:
                         out.write(line)
                 else:
-                    match = re_end.match(line)
-                    if match:
+                    if re_end.match(line):
+                        log.debug("Line %3d: End input", i)
+                        flag = True
+            log.debug("Line %3d: EOF", i)
+
+    def prepare_config_poet(self, input_dir: pathlib.Path) -> None:
+
+        inp_cfg = (
+            self.cmssw_dir
+            / "src/PhysObjectExtractorTool/PhysObjectExtractor/python/poet_cfg.py"
+        )
+        out_cfg = input_dir / "poet_cfg.py"
+
+        log.debug("Writing %s", out_cfg)
+
+        re_source = re.compile(r"\s*process\.source\s*=\s*cms\.Source.*")
+        re_end = re.compile(r"\s*\).*")
+        re_out = re.compile(r"\s*process\.TFileService\s*=\s*cms\.Service\(.*")
+        re_evt = re.compile(
+            r"\s*process\.maxEvents\s*=\s*cms\.untracked\.PSet\("
+            r"\s*input\s*=\s*cms\.untracked\.int32\((\d+)\)\s*\)\s*"
+        )
+        with open(inp_cfg, "r") as inp, open(out_cfg, "w") as out:
+            flag = True
+            for i, line in enumerate(inp.readlines()):
+                if flag:
+                    if re_source.match(line):
+                        log.debug("Line %3d: Found input", i)
+                        flag = False
+                        out.write(FRAGMENT1P)
+                    elif re_out.match(line):
+                        log.debug("Line %3d: Found output", i)
+                        out.write(FRAGMENT2P)
+                    elif re_evt.match(line):
+                        log.debug("Line %3d: Found max events", i)
+                        out.write(FRAGMENT3.format(self.max_events))
+                    else:
+                        out.write(line)
+                else:
+                    if re_end.match(line):
                         log.debug("Line %3d: End input", i)
                         flag = True
             log.debug("Line %3d: EOF", i)
@@ -400,26 +454,54 @@ class Task(fsm.StateMachine):
 
     def prepare_jobscript(self, input_dir: pathlib.Path) -> None:
 
-        template = j2_env.get_template("nanoaod.sh.j2")
-
-        jobscript = input_dir / "nanoaod.sh"
-        log.debug("Writing %s", jobscript)
-        with open(jobscript, "w") as out:
-            out.write(
-                template.render(
-                    dataset=self.dataset_dir.name,
-                    jobscript=f"nanoanalyzer_cfg_{self.config}.py",
-                    cmssw=self.cmssw_dir.name,
-                    output_url=self.output_url,
-                    backup_url=self.backup_url,
+        if self.config.endswith("Poet"):
+            template = j2_env.get_template("poet.sh.j2")
+            pyscript = "poet.py"
+            jobscript = input_dir / "poet.sh"
+            log.debug("Writing %s", jobscript)
+            with open(jobscript, "w") as out:
+                out.write(
+                    template.render(
+                        pyscript=pyscript,
+                        dataflag=self.config.endswith("DataPoet"),
+                        cmssw=self.cmssw_dir.name,
+                        output_url=self.output_url,
+                        backup_url=self.backup_url,
+                    )
                 )
-            )
+        else:
+            pyscript = f"nanoanalyzer_cfg_{self.config}.py"
+            jobscript = input_dir / "nanoaod.sh"
+            if self.config.startswith("2010"):
+                template = j2_env.get_template("nanoaod-slc5.sh.j2")
+            else:
+                template = j2_env.get_template("nanoaod.sh.j2")
+            log.debug("Writing %s", jobscript)
+            with open(jobscript, "w") as out:
+                out.write(
+                    template.render(
+                        dataset=self.dataset_dir.name,
+                        pyscript=pyscript,
+                        cmssw=self.cmssw_dir.name,
+                        output_url=self.output_url,
+                        backup_url=self.backup_url,
+                    )
+                )
 
     def submit(self, max_jobs: int, resubmit: bool = False) -> None:
 
         pathlib.Path(LOG_LOCATION).mkdir(exist_ok=True)
         try:
-            template = j2_env.get_template("nanoaod.job.j2")
+            if self.config.endswith("Poet"):
+                template = j2_env.get_template("poet.job.j2")
+                metadata = PACKAGE_DIR / "scripts/metadata_poet"
+                job_file = self.dataset_dir / "input/poet.job"
+                pyscript = self.dataset_dir / "input/poet_cfg.py"
+            else:
+                template = j2_env.get_template("nanoaod.job.j2")
+                metadata = PACKAGE_DIR / "scripts/metadata"
+                job_file = self.dataset_dir / "input/nanoaod.job"
+                pyscript = self.dataset_dir / f"input/nanoanalyzer_cfg_{self.config}.py"
 
             if resubmit:
                 jobs = [
@@ -433,19 +515,18 @@ class Task(fsm.StateMachine):
                 return
             if max_jobs:
                 jobs = jobs[:max_jobs]
-            job_file = self.dataset_dir / "input/nanoaod.job"
+
             with open(job_file, "w") as out:
                 out.write(
                     template.render(
                         dataset=self.dataset_dir.name,
-                        jobscript=self.dataset_dir
-                        / f"input/nanoanalyzer_cfg_{self.config}.py",
+                        pyscript=pyscript,
                         cmssw=self.cmssw_dir.name,
                         jobs=jobs,
                         log_location=LOG_LOCATION,
                         sites=self.sites,
                         singularity=self.singularity,
-                        metadata=PACKAGE_DIR / "scripts/metadata",
+                        metadata=metadata,
                     )
                 )
 
@@ -493,12 +574,25 @@ class Task(fsm.StateMachine):
             yaml.indent(sequence=4, offset=2)
             yaml.dump(metadata, out)
 
+
     def update(self) -> None:
 
-        log.debug("Updateing %s", self.dataset_dir.name)
+        for j in self.jobs.values():
+            if j.cluster_id is None and j.state in [JobState.READY, JobState.RUNNING]:
+                log.error("Job %s has no condor id", j)
+                j.state = JobState.ERROR
+
         cluster_ids = set(j.cluster_id for j in self.jobs.values() if j.cluster_id)
 
-        if not cluster_ids:
+        if cluster_ids:
+            log.debug(
+                "Updateing %s (%s)",
+                self.dataset_dir.name,
+                ",".join(map(str, cluster_ids)),
+            )
+        else:
+            log.debug("Nothing to update %s", self.dataset_dir.name)
+
             return
 
         output = subprocess.run(
@@ -520,6 +614,10 @@ class Task(fsm.StateMachine):
                     and job.cluster_id in cluster_ids
                 ):
                     job.finish()
+
+        if self.state == JobState.ERROR:
+            if not any(j.state == JobState.ERROR for j in self.jobs.values()):
+                self.state = JobState.READY
 
         if any(j.state == JobState.RUNNING for j in self.jobs.values()):
             self.state = JobState.RUNNING
@@ -666,8 +764,8 @@ class Manager:
             self.project_dir / dataset,
             dasname,
             config,
-            self.output_url + dataset,
-            self.backup_url + dataset,
+            f"{self.output_url}/{dataset}",
+            f"{self.backup_url}/{dataset}",
             self.singularity,
             self.sites,
             max_files,
